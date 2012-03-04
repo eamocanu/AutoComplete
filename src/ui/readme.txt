@@ -1,0 +1,1 @@
+stuff I've stiched together super fast from different various projects I've worked on
