@@ -18,7 +18,9 @@ public interface Dictionary {
 	 * @throws Exception	If the word contains space
 	 */
 	public abstract void addWordSentence(String word) throws Exception;
-
+	
+	
+	public abstract void addWord(String word) throws Exception;
 	
 	/** Given a wordNode and a next character it returns a character node, 
 	 * if it exists in dictionary (of currently looked for word)

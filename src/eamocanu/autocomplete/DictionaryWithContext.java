@@ -33,7 +33,7 @@ import eamocanu.autocomplete.exception.WordException;
 public class DictionaryWithContext {
 
 	/** map to hold tree of chars to form words */
-	private Map<Character, CharacterNode> wordsMap;
+	private Map<Character, CharacterNodeWithContext> wordsMap;
 //	private List<Character> startChars;
 	
 	/** maximum context prefix length in characters */
@@ -47,10 +47,10 @@ public class DictionaryWithContext {
 	
 	public DictionaryWithContext(){
 //		startChars= new ArrayList<Character>();
-		wordsMap= new HashMap<Character, CharacterNode>();
+		wordsMap= new HashMap<Character, CharacterNodeWithContext>();
 		for (char c='a'; c<='z'; c++){
 //			startChars.add(c);
-			CharacterNode wn= new CharacterNode(c);
+			CharacterNodeWithContext wn= new CharacterNodeWithContext(c);
 //			wn.setOriginalWord(true);
 			wordsMap.put(c, wn);
 		}
@@ -80,7 +80,7 @@ public class DictionaryWithContext {
 	 * A suffix and prefix is used to show the word in the context in which it was found
 	 * if the word is part of a sentence. There are optional.
 	 * 
-	 * @param wd		The word to add
+	 * @param word		The word to add
 	 * @param suffix	Used when w is part of a sentence to provide content after w
 	 * @param prefix	Used when w is part of a sentence to provide before after w
 	 * @param realWord	if true, it means the word was added to the dictionary
@@ -90,14 +90,14 @@ public class DictionaryWithContext {
 	 * 
 	 * @throws Exception	If the word to add has length 0
 	 */
-	private synchronized void add(String wd, String suffix, String prefix, boolean realWord) throws WordException{
-		if (wd.length() == 0) throw new WordException("Words cannot have no characters");
-		CharacterNode wn= wordsMap.get(wd.charAt(0));
+	private synchronized void add(String word, String suffix, String prefix, boolean realWord) throws WordException{
+		if (word.length() == 0) throw new WordException("Words cannot have no characters");
+		CharacterNodeWithContext wn= wordsMap.get(word.charAt(0));
 		
 		if (wn == null){
 			//this words starts w a character which has not been mapped/encountered yet
-			wn= new CharacterNode(wd.charAt(0));
-			wordsMap.put(wd.charAt(0), wn );
+			wn= new CharacterNodeWithContext(word.charAt(0));
+			wordsMap.put(word.charAt(0), wn );
 //			startChars.add(wd.charAt(0));
 			wn.setOriginalWord(realWord);
 		}
@@ -106,14 +106,14 @@ public class DictionaryWithContext {
 			wn.setOriginalWord(true);
 		}
 		
-		for (int i=1; i<wd.length() ; i++){
-			char crtChar= wd.charAt(i);
+		for (int i=1; i<word.length() ; i++){
+			char crtChar= word.charAt(i);
 			if (wn.getChild(crtChar) == null){
 				wn.addChild(crtChar);
 			}
 			//special case for indexing words in the middle of the sentence
 			if (crtChar == ' '){
-				createNewWordIndex(i, wd);
+				createNewWordIndex(i, word);
 			}
 
 //			System.out.println(wn);
@@ -125,14 +125,14 @@ public class DictionaryWithContext {
 		
 //		//add ending
 //		//wn.addChild(CharacterNode.END_NODE);
-//		CharacterNode end= new CharacterNode(CharacterNode.END);
+//		CharacterNodeI end= new CharacterNode(CharacterNode.END);
 //		wn.addChild(CharacterNode.END_NODE);
 
 		//to save memory for real words
 		if (realWord)
-			wn.addChild(CharacterNode.END_NODE);
+			wn.addChild(CharacterNodeWithContext.END_NODE);
 		else{
-			CharacterNode end= new CharacterNode(CharacterNode.END);
+			CharacterNodeWithContext end= new CharacterNodeWithContext(CharacterNode.END);
 			end.setOriginalWord(realWord);
 			wn.addChild(end);
 			end.setPrefixWord(prefix);
@@ -190,8 +190,8 @@ public class DictionaryWithContext {
 	/* (non-Javadoc)
 	 * @see Dictionary#getNextNodeForPrefix(char, CharacterNode)
 	 */
-	public synchronized CharacterNode getNextNodeForPrefix(char nextChar, CharacterNode wn) {
-		CharacterNode returnNode=null;
+	public synchronized CharacterNodeWithContext getNextNodeForPrefix(char nextChar, CharacterNodeWithContext wn) {
+		CharacterNodeWithContext returnNode=null;
 		
 		if (wn == null){
 			returnNode= wordsMap.get(nextChar);
@@ -200,7 +200,7 @@ public class DictionaryWithContext {
 		}
 		
 		//("Word Does not exist");
-		if (returnNode==null) return CharacterNode.EMPTY;
+		if (returnNode==null) return  CharacterNodeWithContext.EMPTY;
 		
 		return returnNode; 
 	}
@@ -244,7 +244,7 @@ public class DictionaryWithContext {
 	 * @return 	Returns list of words which start with prefix pref
 	 */
 	public List<String> getWordsForPrefix(String pref, int size){
-		CharacterNode wn =getNextNodeForPrefix(pref.charAt(0), null);
+		CharacterNodeWithContext wn =getNextNodeForPrefix(pref.charAt(0), null);
 		for (int i=1; i<pref.length(); i++){
 			wn= getNextNodeForPrefix(pref.charAt(i), wn);
 		}
@@ -263,10 +263,12 @@ public class DictionaryWithContext {
 	 * @return
 	 */
 	public List<String> getFormattedWordsForPrefix(String pref, int size){
-		CharacterNode wn =getNextNodeForPrefix(pref.charAt(0), null);
+		CharacterNodeWithContext wn =getNextNodeForPrefix(pref.charAt(0), null);
+		
 		for (int i=1; i<pref.length(); i++){
 			wn= getNextNodeForPrefix(pref.charAt(i), wn);
 		}
+		
 		List<String> words = getFormattedWordsForPrefix(wn);
 		if (words.size()>size){
 			return words.subList(0, size);
@@ -283,7 +285,7 @@ public class DictionaryWithContext {
 	//TODO observation: since there is no list size limit, can easily deduce
 	//					next step words by removing all words from prev step which
 	//					done't match current prefix: ie word_i.charAt[nextStep]!=wn.charAt(wn.length()-1]
-	public synchronized List<String> getWordsForPrefix(CharacterNode cn){
+	public synchronized List<String> getWordsForPrefix(CharacterNodeWithContext cn){
 		if (cn==null) return Collections.emptyList();//EMPTY_LIST;
 
 		List<String> allWords= new ArrayList<String>();
@@ -293,7 +295,7 @@ public class DictionaryWithContext {
 	}
 	
 	
-	public synchronized List<String> getFormattedWordsForPrefix(CharacterNode cn){
+	public synchronized List<String> getFormattedWordsForPrefix(CharacterNodeWithContext cn){
 		if (cn==null) return Collections.emptyList();//EMPTY_LIST;
 		
 		List<String> allWords= new ArrayList<String>();
@@ -310,7 +312,7 @@ public class DictionaryWithContext {
 	public synchronized List<String> getAllWords(){
 		List<String> allWords= new ArrayList<String>();
 		
-		for (Map.Entry<Character, CharacterNode> pair: wordsMap.entrySet()){
+		for (Map.Entry<Character, CharacterNodeWithContext> pair: wordsMap.entrySet()){
 			getWords(allWords, "", wordsMap.get(pair.getValue()), true);
 		}
 //		for (Character c: startChars){//TODO replace w map.getKeySet and get its pair/value
@@ -324,7 +326,7 @@ public class DictionaryWithContext {
 	public synchronized List<String> getAllWordsWFakes(){
 		List<String> allWords= new ArrayList<String>();
 
-		for (Map.Entry<Character, CharacterNode> pair: wordsMap.entrySet()){
+		for (Map.Entry<Character, CharacterNodeWithContext> pair: wordsMap.entrySet()){
 			getWords(allWords, "", wordsMap.get(pair.getValue()), false);
 		}
 //		for (Character c: startChars){//TODO replace w map.getKeySet and get its pair/value
@@ -335,7 +337,7 @@ public class DictionaryWithContext {
 	}
 	
 	//always returns original and nonoriginal words
-//	private synchronized void getWords(List<CharacterNode> wordsList, CharacterNode wn) {
+//	private synchronized void getWords(List<CharacterNode> wordsList, CharacterNodeI wn) {
 //		if (wn==null) return;
 //		//if (original) if (!wn.isOriginal()) return;
 //		
@@ -349,7 +351,7 @@ public class DictionaryWithContext {
 //		
 //		//crtWordChars += wn.getWordChar();//gets crt char not word
 //		wordsList.add(wn);
-//		for (CharacterNode crtChild: wn.getChildren()){
+//		for (CharacterNodeI crtChild: wn.getChildren()){
 //			getWords(wordsList, crtChild);
 //		}
 //		
@@ -386,7 +388,7 @@ public class DictionaryWithContext {
 	 */
 	//initially I wanted to see how it performs via RMI and multiple calls.
 	//might not make sense to put a lock on it, but use a load balancer... will see
-	private synchronized void getWords(List<String> wordsList, String crtWordChars, CharacterNode wn, boolean original) {
+	private synchronized void getWords(List<String> wordsList, String crtWordChars, CharacterNodeWithContext wn, boolean original) {
 		if (wn==null) return;
 		if (original) if (!wn.isOriginal()) return;
 		
@@ -402,7 +404,7 @@ public class DictionaryWithContext {
 		crtWordChars += wn.getChar();//gets crt char not word
 		
 		for (CharacterNode crtChild: wn.getChildren()){
-			getWords(wordsList, crtWordChars, crtChild, original);
+			getWords(wordsList, crtWordChars, (CharacterNodeWithContext)crtChild, original);
 		}
 		
 	}
@@ -422,7 +424,7 @@ public class DictionaryWithContext {
 	 * @PARAM original
 	 * 
 	 */
-	private synchronized void getFormattedWords(String prefix, List<String> wordsList, String crtWordChars, CharacterNode wn, boolean original) {
+	private synchronized void getFormattedWords(String prefix, List<String> wordsList, String crtWordChars, CharacterNodeWithContext wn, boolean original) {
 		if (wn==null) return;
 		if (original) if (!wn.isOriginal()) return;
 		
@@ -458,7 +460,7 @@ public class DictionaryWithContext {
 		crtWordChars += wn.getChar();
 		
 		for (CharacterNode crtChild: wn.getChildren()){
-			getFormattedWords(prefix, wordsList, crtWordChars, crtChild, original);
+			getFormattedWords(prefix, wordsList, crtWordChars, (CharacterNodeWithContext)crtChild, original);
 		}
 		
 	}
@@ -469,7 +471,7 @@ public class DictionaryWithContext {
 	 */
 	public synchronized boolean hasWord(String word){
 		//retrieve root for all wds starting w char @ 0
-		CharacterNode wordNode =getNextNodeForPrefix(word.charAt(0), null);
+		CharacterNodeWithContext wordNode =getNextNodeForPrefix(word.charAt(0), null);
 		if (wordNode==null) return false;
 		//TODO check isOriginal() status before returning is word exists
 		
